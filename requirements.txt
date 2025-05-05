@@ -1,7 +1,6 @@
 Flask
 python-dotenv
 openai
-image-resizor  # Replace with actual package name if this isn't correct
 Werkzeug
 Pillow  # If you're dealing with image processing
 sqlite3  # Included by default with Python, but no need to add it to requirements
