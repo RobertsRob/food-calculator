@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Food Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* height: 100vh; */
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+        }
+
+        p {
+            margin: 0.5rem 0;
+        }
+
+        a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        form {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin: 1rem 0;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        form label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        form input, form select, form button{
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        form button{
+            background-color: #333;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        form button:hover {
+            background-color: #555;
+        }
+
+        #loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 5px;
+        }
+
+        table {
+            width: 70%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .delete-button {
+            color: red;
+            cursor: pointer;
+        }
+        .text_p {
+            font-size: 1.2rem;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- <h1>Welcome, {{ name }}!</h1>
+    <p><strong>Username:</strong> {{ username }}</p>
+    <p><strong>User Data:</strong> {{ data }}</p>
+    <p><strong>Today:</strong> {{ today }}</p> -->
+
+
+    <!-- <h1>Welcome, {{ name }}!</h1> -->
+    <p style="display: none;"><strong>Username:</strong> {{ username }}</p>
+    <p style="display: none;"><strong>User Data:</strong> <span id="user-data">{{ data | tojson }}</span></p> <!-- We are embedding the data here -->
+
+    <p style="display: none;"><strong>Today:</strong> {{ today }}</p>
+
+    <div  style="padding-top: 50px;">
+        <h1>Today's Progress:</h1>
+        <div>
+            <p class="text_p"><strong>Goal Calories:</strong> {{ goal_calories }} | <strong>Consumed:</strong> <span id="calories-consumed">0</span> kcal</p>
+            <div class="progress">
+                <div id="calories-progress" class="progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div>
+            <p class="text_p"><strong>Goal Protein:</strong> {{ goal_protein }}g | <strong>Consumed:</strong> <span id="protein-consumed">0</span> g</p>
+            <div class="progress">
+                <div id="protein-progress" class="progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div>
+            <p class="text_p"><strong>Goal Carbs:</strong> {{ goal_carbs }}g | <strong>Consumed:</strong> <span id="carbs-consumed">0</span> g</p>
+            <div class="progress">
+                <div id="carbs-progress" class="progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div>
+            <p class="text_p"><strong>Goal Fats:</strong> {{ goal_fats }}g | <strong>Consumed:</strong> <span id="fats-consumed">0</span> g</p>
+            <div class="progress">
+                <div id="fats-progress" class="progress-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Extract user data from the <span> with id "user-data"
+        const userDataText = document.getElementById('user-data').innerText;
+    
+        // Parse the extracted text as JSON
+        const userData = JSON.parse(userDataText);
+    
+        // Extract necessary data from the parsed JSON
+        const savedDays = userData.saved_days;
+        const goalCalories = userData.calories;
+        const goalProtein = userData.protein;
+        const goalCarbs = userData.carbs;
+        const goalFats = userData.fats;
+        const today = '{{ today }}';
+    
+        // Function to update progress bars
+        function updateProgressBars() {
+            // Initialize totals for today
+            let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFats = 0;
+    
+            // Sum the nutrients for the meals today
+            if (savedDays[today]) {
+                savedDays[today].forEach(meal => {
+                    totalCalories += meal.calories;
+                    totalProtein += meal.protein;
+                    totalCarbs += meal.carbs;
+                    totalFats += meal.fats;
+                });
+            }
+    
+            // Update the consumed values in the UI
+            document.getElementById('calories-consumed').innerText = totalCalories;
+            document.getElementById('protein-consumed').innerText = totalProtein;
+            document.getElementById('carbs-consumed').innerText = totalCarbs;
+            document.getElementById('fats-consumed').innerText = totalFats;
+    
+            // Update the progress bars, ensuring they don't go above 100%
+            document.getElementById('calories-progress').style.width = Math.min((totalCalories / goalCalories * 100), 100) + '%';
+            document.getElementById('protein-progress').style.width = Math.min((totalProtein / goalProtein * 100), 100) + '%';
+            document.getElementById('carbs-progress').style.width = Math.min((totalCarbs / goalCarbs * 100), 100) + '%';
+            document.getElementById('fats-progress').style.width = Math.min((totalFats / goalFats * 100), 100) + '%';
+        }
+    
+        // Call the update function on page load
+        window.onload = function() {
+            updateProgressBars();
+        };
+    </script>
+
+    <style>
+        .progress {
+            width: 100%;
+            background-color: #ff7777;
+            border-radius: 25px;
+            margin-top: 5px;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            height: 30px;
+            border-radius: 25px;
+            background-color: #4caf50;
+            text-align: center;
+            color: white;
+            line-height: 30px;
+        }
+    </style>
+
+
+
+
+
+    
+
+
+    
+
+
+    <form id="bmiForm">
+        <label for="coment">Comment:</label>
+        <input type="text" id="coment" name="coment" required>
+
+        <label for="image">Image (png):</label>
+        <input type="file" id="image" name="image" required>
+
+        <button type="submit">Calculate Food</button>
+    </form>
+
+    <button type="button" id="toggleMacroForm" style="background-color: #333; color: #fff; border: none; cursor: pointer; padding: 0.8rem; margin-bottom: 1rem; border-radius: 5px; font-size: 1rem; transition: background-color 0.3s ease;">Change my parameters</button>
+
+    <script>
+        document.getElementById("toggleMacroForm").addEventListener("click", function () {
+            const macroForm = document.getElementById("macro-form");
+            if (macroForm.style.display === "none" || macroForm.style.display === "") {
+                macroForm.style.display = "block";
+            } else {
+                macroForm.style.display = "none";
+            }
+        });
+        document.getElementById("macro-form").style.display = "none";
+    </script>
+    <form id="macro-form" style="display: none;">
+        <label for="mass">Mass (kg):</label>
+        <input type="number" name="mass" required>
+
+        <label for="height">Height (cm):</label>
+        <input type="number" name="height" required>
+
+        <label for="activity">Activity level:</label>
+        <select name="activity" required>
+            <option value="ordinary">Ordinary</option>
+            <option value="light_sport">Light sport</option>
+            <option value="muscle_gain">Muscle gain</option>
+        </select>
+
+        <button type="submit">Calculate</button>
+    </form>
+
+    <div id="loading">Loading...</div>
+</body>
+</html>
+
+    <script>
+        document.getElementById("bmiForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+        
+            const form = document.getElementById("bmiForm");
+            const formData = new FormData(form);
+            const loading = document.getElementById("loading");
+        
+            loading.style.display = "block"; // Show loading screen
+        
+            try {
+                const response = await fetch("/bmi", {
+                    method: "POST",
+                    body: formData
+                });
+        
+                if (!response.ok) {
+                    const err = await response.text();
+                    console.error("Server error:", err);
+                    alert("Failed to analyze image. Please try again.");
+                    return;
+                }
+        
+                const data = await response.json();
+                console.log("Food analysis saved:", data.food_result);
+                location.reload();
+                
+            } catch (error) {
+                console.error("Network or parsing error:", error);
+                alert("Something went wrong. Try again.");
+            } finally {
+                loading.style.display = "none"; // Hide loading screen
+            }
+        });
+
+
+    document.getElementById("macro-form").addEventListener("submit", async function (e) {
+        e.preventDefault(); // предотвращаем обычную отправку
+
+        const form = e.target;
+        const formData = new FormData(form);
+
+        loading.style.display = "block";
+
+        const response = await fetch("/calculate_macros", {
+            method: "POST",
+            body: formData
+        });
+
+        if (response.ok) {
+            // Всё прошло успешно, перезагружаем страницу
+            loading.style.display = "none";
+            location.reload();
+        } else {
+            alert("Error calculating macros");
+        }
+    });
+    </script>
+
+
+
+
+
+    <h1>Meals List</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Meal Name</th>
+                <th>Calories</th>
+                <th>Protein</th>
+                <th>Carbs</th>
+                <th>Fats</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="meals-table-body">
+            {% for date, meals in data.saved_days.items() %}
+                {% for meal in meals %}
+                    <tr id="meal-{{ loop.index }}">
+                        <td>{{ meal.name }}</td>
+                        <td>{{ meal.calories }}</td>
+                        <td>{{ meal.protein }}</td>
+                        <td>{{ meal.carbs }}</td>
+                        <td>{{ meal.fats }}</td>
+                        <td><button class="delete-button" onclick="deleteMeal('{{ date }}', '{{ loop.index }}')">Delete</button></td>
+                    </tr>
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        function deleteMeal(date, mealIndex) {
+            if (confirm('Are you sure you want to delete this meal?')) {
+                fetch('/delete_meal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        date: date,
+                        mealIndex: mealIndex-1
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete the meal.');
+                    }
+                });
+            }
+        }
+    </script>
+    <br><br>
+    <p class="text_p"><a href="{{ url_for('logout') }}">Logout</a></p>
+</body>
+</html>

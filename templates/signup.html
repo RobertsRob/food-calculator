@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign up</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <h2>Sign up</h2>
+        <form action="/signup_processor" method="POST">
+            {% if signup_error %}
+                <div style="color: red;">
+                {{ signup_error }}
+                </div>
+            {% endif %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <div class="form-group">
+                <label for="password_repeat">Repeat password</label>
+                <input type="password" id="password_repeat" name="password_repeat" placeholder="Repeat your password" required>
+            </div>
+            <div class="form-group">
+                <label for="key">Key</label>
+                <input type="text" id="key" name="key" placeholder="Enter your key" required>
+            </div>
+            <button type="submit" class="signup-btn">Sign up</button>
+        </form>
+        <div class="signup-link">
+            <p>Have an account? <a href="login">Login</a></p>
+        </div>
+    </div>
+</body>
+</html>

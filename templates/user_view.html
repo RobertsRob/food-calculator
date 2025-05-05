@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Users</title>
+    <style>
+        body { font-family: Arial; padding: 2rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .danger { color: red; }
+    </style>
+</head>
+<body>
+    <p><a href="{{ url_for('admin_panel') }}">⬅️ Back to Admin Panel</a></p>
+    
+    <h1>👥 User View</h1>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Created At</th>
+            <th>Data</th>
+            <th>Action</th>
+        </tr>
+        {% for user_id, name, data, created_at in users %}
+        <tr>
+            <td>{{ user_id }}</td>
+            <td>{{ name }}</td>
+            <td>{{ created_at }}</td>
+            <td><pre>{{ data }}</pre></td>
+            <td>
+                <form method="post" style="display:inline;">
+                    <input type="hidden" name="delete_id" value="{{ user_id }}">
+                    <button type="submit" onclick="return confirm('Delete user {{ name }}?')" class="danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

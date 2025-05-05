@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Key Creator</title>
+    <style>
+        body { font-family: Arial; padding: 2rem; }
+        .danger { color: red; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { padding: 8px; border: 1px solid #ccc; text-align: left; }
+    </style>
+</head>
+<body>
+    <p><a href="{{ url_for('admin_panel') }}">⬅️ Back to Admin Panel</a></p>
+    <h1>🔑 Key Creator</h1>
+
+    <form method="post">
+        <button type="submit">Generate New Key</button>
+    </form>
+
+    {% if new_key %}
+        <p><strong>New key created:</strong> {{ new_key }}</p>
+    {% endif %}
+
+    <h2>🗂 All Keys</h2>
+    <table>
+        <tr>
+            <th>Key</th>
+            <th>Used?</th>
+            <th>Action</th>
+        </tr>
+        {% for key, used in keys %}
+        <tr>
+            <td>{{ key }}</td>
+            <td>
+                {% if used %}
+                    <span style="color: red;">❌ Used</span>
+                {% else %}
+                    <span style="color: green;">✅ Available</span>
+                {% endif %}
+            </td>
+            <td>
+                <form method="post" style="display:inline;">
+                    <input type="hidden" name="delete_key" value="{{ key }}">
+                    <button type="submit" onclick="return confirm('Delete key {{ key }}?')" class="danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
