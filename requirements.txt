@@ -1,5 +1,4 @@
 Flask
 python-dotenv
 openai
-image_resizor
 gunicorn
