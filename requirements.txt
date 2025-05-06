@@ -6,3 +6,4 @@ Pillow  # If you're dealing with image processing
 gunicorn  # Included by default with Python, but no need to add it to requirements
 # If you use `secrets` (part of Python standard library), you don't need to add it
 psycopg2-binary
+flask_sqlalchemy
