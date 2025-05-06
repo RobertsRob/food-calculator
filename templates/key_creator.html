@@ -28,11 +28,11 @@
             <th>Used?</th>
             <th>Action</th>
         </tr>
-        {% for key, used in keys %}
+        {% for key_obj in keys %}
         <tr>
-            <td>{{ key }}</td>
+            <td>{{ key_obj.key }}</td>
             <td>
-                {% if used %}
+                {% if key_obj.used %}
                     <span style="color: red;">❌ Used</span>
                 {% else %}
                     <span style="color: green;">✅ Available</span>
@@ -40,12 +40,13 @@
             </td>
             <td>
                 <form method="post" style="display:inline;">
-                    <input type="hidden" name="delete_key" value="{{ key }}">
-                    <button type="submit" onclick="return confirm('Delete key {{ key }}?')" class="danger">Delete</button>
+                    <input type="hidden" name="delete_key" value="{{ key_obj.key }}">
+                    <button type="submit" onclick="return confirm('Delete key {{ key_obj.key }}?')" class="danger">Delete</button>
                 </form>
             </td>
         </tr>
         {% endfor %}
     </table>
 </body>
+
 </html>

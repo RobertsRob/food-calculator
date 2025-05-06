@@ -344,6 +344,7 @@
             </tr>
         </thead>
         <tbody id="meals-table-body">
+            {% if data.saved_days %}
             {% for date, meals in data.saved_days.items() %}
                 {% for meal in meals %}
                     <tr id="meal-{{ loop.index }}">
@@ -356,6 +357,9 @@
                     </tr>
                 {% endfor %}
             {% endfor %}
+        {% else %}
+            <tr><td colspan="6">No saved meals yet.</td></tr>
+        {% endif %}
         </tbody>
     </table>
 

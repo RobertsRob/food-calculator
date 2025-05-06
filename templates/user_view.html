@@ -22,16 +22,16 @@
             <th>Data</th>
             <th>Action</th>
         </tr>
-        {% for user_id, name, data, created_at in users %}
+        {% for user in users %}
         <tr>
-            <td>{{ user_id }}</td>
-            <td>{{ name }}</td>
-            <td>{{ created_at }}</td>
-            <td><pre>{{ data }}</pre></td>
+            <td>{{ user.user_id }}</td>
+            <td>{{ user.name }}</td>
+            <td>{{ user.created_at }}</td>
+            <td><pre>{{ user.data }}</pre></td>
             <td>
                 <form method="post" style="display:inline;">
-                    <input type="hidden" name="delete_id" value="{{ user_id }}">
-                    <button type="submit" onclick="return confirm('Delete user {{ name }}?')" class="danger">Delete</button>
+                    <input type="hidden" name="delete_id" value="{{ user.user_id }}">
+                    <button type="submit" onclick="return confirm('Delete user {{ user.name }}?')" class="danger">Delete</button>
                 </form>
             </td>
         </tr>

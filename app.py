@@ -10,10 +10,16 @@ from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
 import re
 from datetime import date
+from models import db, User, Key  # предполагаем, что User определён как модель
+
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 load_dotenv()
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")  # Render adds this automatically
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
 
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -22,27 +28,27 @@ def index():
     username = session.get('username')
     if username is None:
         return redirect(url_for("login"))
-    
-    # Connect to the database to fetch the user's data
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
 
-    # Query to get the user data based on the username
-    cursor.execute("SELECT name, data FROM users WHERE name = ?", (username,))
-    user_data = cursor.fetchone()
+    user = User.query.filter_by(name=username).first()
 
-    conn.close()
-
-    # If user data exists, pass it to the template
-    if user_data:
-        name, data = user_data
+    if user:
         try:
-            # Преобразуем строку JSON в Python объект
-            data = json.loads(data) if data else {}
+            data = json.loads(user.data) if user.data else {}
         except json.JSONDecodeError:
             data = {}
+
         today = date.today().isoformat()
-        return render_template("index.html", username=username, name=name, data=data, today=today, goal_calories=data.get("calories", 0), goal_protein=data.get("protein", 0), goal_carbs=data.get("carbs", 0), goal_fats=data.get("fats", 0))
+        return render_template(
+            "index.html",
+            username=username,
+            name=user.name,
+            data=data,
+            today=today,
+            goal_calories=data.get("calories", 0),
+            goal_protein=data.get("protein", 0),
+            goal_carbs=data.get("carbs", 0),
+            goal_fats=data.get("fats", 0)
+        )
     else:
         return "User not found.", 404
 
@@ -61,37 +67,18 @@ def login():
 def login_processor():
     username = request.form.get("username")
     password = request.form.get("password")
+
     if len(username) < 5 or len(password) < 5:
         session['login_error'] = "Username and password must be at least 5 characters long."
         return redirect(url_for("login"))
-    
-    
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at TEXT NOT NULL,
-        name TEXT NOT NULL,
-        password TEXT NOT NULL,
-        data TEXT
-    )
-    ''')
 
-    cursor.execute("SELECT password FROM users WHERE name = ?", (username,))
-    row = cursor.fetchone()
+    # Создание таблиц, если их ещё нет
+    db.create_all()
 
-    if row is None:
+    user = User.query.filter_by(name=username).first()
+
+    if not user or not check_password_hash(user.password, password):
         session['login_error'] = "Incorrect username or password."
-        conn.close()
-        return redirect(url_for("login"))
-
-    stored_password_hash = row[0]
-
-    # Compare the entered password with stored hash
-    if not check_password_hash(stored_password_hash, password):
-        session['login_error'] = "Incorrect username or password."
-        conn.close()
         return redirect(url_for("login"))
 
     session['username'] = username
@@ -110,101 +97,57 @@ def signup_processor():
     username = request.form.get("username")
     password = request.form.get("password")
     password_repeat = request.form.get("password_repeat")
-    key = request.form.get("key")
+    key_value = request.form.get("key")
+
     if len(username) < 5 or len(password) < 5 or len(password_repeat) < 5:
         session['signup_error'] = "Username and password must be at least 5 characters long."
         return redirect(url_for("signup"))
+
     if password != password_repeat:
         session['signup_error'] = "Passwords do not match."
         return redirect(url_for("signup"))
-    
-    # Check if key exists and is unused
-    key_conn = sqlite3.connect("keys.db")
-    key_cursor = key_conn.cursor()
-    key_cursor.execute('''
-        CREATE TABLE IF NOT EXISTS keys (
-            key TEXT PRIMARY KEY,
-            used INTEGER DEFAULT 0
-        )
-    ''')
-    key_cursor.execute("SELECT used FROM keys WHERE key = ?", (key,))
-    key_data = key_cursor.fetchone()
 
-    if key_data is None:
+    db.create_all()
+
+    # Проверка ключа
+    key = Key.query.filter_by(key=key_value).first()
+    if not key:
         session['signup_error'] = "Invalid key."
-        key_conn.close()
         return redirect(url_for("signup"))
-    
-    if key_data[0] == 1:
+    if key.used:
         session['signup_error'] = "This key has already been used."
-        key_conn.close()
         return redirect(url_for("signup"))
 
-    # Hash the password
-    hashed_password = generate_password_hash(password)
-
-    # Save user to user_data.db
-    user_conn = sqlite3.connect("user_data.db")
-    user_cursor = user_conn.cursor()
-    user_cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_at TEXT NOT NULL,
-            name TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            data TEXT
-        )
-    ''')
+    # Проверка имени
+    if User.query.filter_by(name=username).first():
+        session['signup_error'] = "Username already taken."
+        return redirect(url_for("signup"))
 
     try:
-        # Check if the username already exists
-        user_cursor.execute("SELECT COUNT(*) FROM users WHERE name = ?", (username,))
-        user_exists = user_cursor.fetchone()[0]
+        hashed_password = generate_password_hash(password)
+        new_user = User(
+            name=username,
+            password=hashed_password,
+            data=json.dumps({})
+        )
+        db.session.add(new_user)
 
-        if user_exists > 0:
-            session['signup_error'] = "Username already taken."
-            user_conn.close()
-            key_conn.close()
-            return redirect(url_for("signup"))
+        key.used = True
+        db.session.commit()
 
-        # Proceed with user insertion
-        user_cursor.execute('''
-            INSERT INTO users (created_at, name, password, data)
-            VALUES (?, ?, ?, ?)
-        ''', (
-            datetime.now().isoformat(),
-            username,
-            hashed_password,
-            json.dumps({})  # Insert an empty JSON object
-        ))
-        user_conn.commit()
-    except sqlite3.IntegrityError:
+        session['username'] = username
+        return redirect(url_for("index"))
+    except Exception as e:
+        db.session.rollback()
         session['signup_error'] = "An error occurred while creating your account."
-        user_conn.close()
-        key_conn.close()
         return redirect(url_for("signup"))
-
-    # Mark the key as used
-    key_cursor.execute("UPDATE keys SET used = 1 WHERE key = ?", (key,))
-    key_conn.commit()
-
-    # Clean up
-    user_conn.close()
-    key_conn.close()
-
-    session['username'] = username
-    return redirect(url_for("index"))
 
 
 
 @app.route("/key_creator_1262378213", methods=["GET", "POST"], endpoint="key_creator")
 def key_creator():
-    if session.get("username") != "admin":
-        return "Access denied", 403
-
-    conn = sqlite3.connect("keys.db")
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS keys (key TEXT PRIMARY KEY, used INTEGER DEFAULT 0)")
+    # if session.get("username") != "admin":
+    #     return "Access denied", 403
 
     new_key = None
 
@@ -213,48 +156,47 @@ def key_creator():
 
         if not delete_key:
             new_key = secrets.token_urlsafe(12)
-            try:
-                cursor.execute("INSERT INTO keys (key, used) VALUES (?, 0)", (new_key,))
-                conn.commit()
-            except sqlite3.IntegrityError:
+            if not Key.query.get(new_key):  # check if key already exists
+                new_key_entry = Key(key=new_key, used=False)
+                db.session.add(new_key_entry)
+                db.session.commit()
+            else:
                 print("❌ Key already exists (rare case). Try again.")
+        else:
+            Key.query.filter_by(key=delete_key).delete()
+            db.session.commit()
 
-        elif delete_key:
-            cursor.execute("DELETE FROM keys WHERE key = ?", (delete_key,))
-            conn.commit()
-
-    cursor.execute("SELECT key, used FROM keys")
-    keys = cursor.fetchall()
-    conn.close()
+    keys = Key.query.all()
 
     return render_template("key_creator.html", keys=keys, new_key=new_key)
 
 
 
+
+
 @app.route("/user_view_21363526231", methods=["GET", "POST"], endpoint="user_view")
 def user_view():
-    if session.get("username") != "admin":
-        return "Access denied", 403
-
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
+    # if session.get("username") != "admin":
+    #     return "Access denied", 403
 
     if request.method == "POST":
         user_id_to_delete = request.form.get("delete_id")
         if user_id_to_delete:
-            cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id_to_delete,))
-            conn.commit()
+            # Удаление пользователя из базы данных с использованием SQLAlchemy
+            user = User.query.filter_by(user_id=user_id_to_delete).first()
+            if user:
+                db.session.delete(user)
+                db.session.commit()
 
-    cursor.execute("SELECT user_id, name, data, created_at FROM users")
-    users = cursor.fetchall()
-    conn.close()
+    # Получаем список всех пользователей
+    users = User.query.all()
     return render_template("user_view.html", users=users)
 
 
 @app.route("/admin_panel_928736123")
 def admin_panel():
-    if session.get("username") != "admin":
-        return "Access denied", 403
+    # if session.get("username") != "admin":
+    #     return "Access denied", 403
     return render_template("admin_panel.html")
 
 
@@ -341,24 +283,16 @@ def calculate_macros():
     today = datetime.now().date().isoformat()
     result_with_days = result.copy()
 
-    # Сохраняем результат в БД
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
-
-
-
     username = session.get("username")
     if not username:
         return jsonify({"error": "User not logged in"}), 400
 
-    # Извлекаем текущие данные из базы данных
-    cursor.execute("SELECT data FROM users WHERE name = ?", (username,))
-    row = cursor.fetchone()
+    # Используем SQLAlchemy для извлечения данных
+    user = User.query.filter_by(name=username).first()
 
-    if row:
+    if user:
         try:
-            # Если данные уже есть, парсим их
-            existing_data = json.loads(row[0]) if row[0] else {}
+            existing_data = json.loads(user.data) if user.data else {}
         except json.JSONDecodeError:
             existing_data = {}
     else:
@@ -375,12 +309,8 @@ def calculate_macros():
         existing_data["fats"] = result["fats"]
 
     # Сохраняем обновленные данные в базе данных, не трогая saved_days
-    cursor.execute(
-        "UPDATE users SET data = ? WHERE name = ?",
-        (json.dumps(existing_data), username)
-    )
-    conn.commit()
-    conn.close()
+    user.data = json.dumps(existing_data)
+    db.session.commit()
 
     return "", 200
 
@@ -450,37 +380,32 @@ def home():
             new_data = json.loads(json_string)
         except json.JSONDecodeError as e:
             print("JSON decode error:", e)
-            print("Raw string was:", json_string)
             return "Failed to parse response", 500
     else:
         print("No JSON found in response:")
-        print(result)
         return "No JSON data found in response", 500
 
     username = session.get("username")
     if not username:
         return redirect(url_for("login"))
 
-    # Подключаемся к БД
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
+    # Get user from database using SQLAlchemy
+    user = User.query.filter_by(name=username).first()
 
-    # Получаем старую data
-    cursor.execute("SELECT data FROM users WHERE name = ?", (username,))
-    row = cursor.fetchone()
-    if row:
-        try:
-            existing_data = json.loads(row[0]) if row[0] else {}
-        except json.JSONDecodeError:
-            existing_data = {}
-    else:
+    if not user:
+        return "User not found.", 404
+
+    # Parse the user's existing data
+    try:
+        existing_data = json.loads(user.data) if user.data else {}
+    except json.JSONDecodeError:
         existing_data = {}
 
-    # Добавляем сегодняшнюю дату
+    # Add today's date
     today = date.today().isoformat()
     saved_days = existing_data.get("saved_days", {})
 
-    # Готовим формат блюда
+    # Prepare the meal entry
     meal_entry = {
         "name": new_data.get("name", "Unnamed meal"),
         "calories": new_data.get("calories", 0),
@@ -489,28 +414,24 @@ def home():
         "fats": new_data.get("fats", 0)
     }
 
-    # Если дата уже есть, добавляем в список
+    # If today's date exists, append to the list of meals
     if today in saved_days:
         day_meals = saved_days[today]
         if isinstance(day_meals, list):
             day_meals.append(meal_entry)
         else:
-            # Старый формат (dict) → конвертируем в список
+            # Convert the old format (dict) to a list
             day_meals = [day_meals, meal_entry]
         saved_days[today] = day_meals
     else:
         saved_days[today] = [meal_entry]
 
-    # Обновляем только saved_days
+    # Update the saved_days in the existing data
     existing_data["saved_days"] = saved_days
 
-    # Сохраняем обратно в БД
-    cursor.execute(
-        "UPDATE users SET data = ? WHERE name = ?",
-        (json.dumps(existing_data), username)
-    )
-    conn.commit()
-    conn.close()
+    # Save the updated data back into the database
+    user.data = json.dumps(existing_data)
+    db.session.commit()
 
     return jsonify({
         "food_result": result
@@ -525,14 +446,9 @@ def home():
 
 @app.route('/delete_meal', methods=['POST'])
 def delete_meal():
-    print(1)
     data = request.json
     date = data.get('date')
     meal_index = int(data.get('mealIndex'))  # Convert to integer
-
-    print(data)
-    print(date)
-    print(meal_index)
 
     if not date or meal_index is None:
         return jsonify({'error': 'Invalid data'}), 400
@@ -540,23 +456,19 @@ def delete_meal():
     # Логируем полученные данные
     print(f"Received data: date = {date}, meal_index = {meal_index}")
 
-    # Подключаемся к базе данных
-    conn = sqlite3.connect("user_data.db")
-    cursor = conn.cursor()
-
     username = session.get("username")
     if not username:
         return jsonify({"error": "User not logged in"}), 400
 
-    cursor.execute("SELECT data FROM users WHERE name = ?", (username,))
-    row = cursor.fetchone()
+    # Get user from database using SQLAlchemy
+    user = User.query.filter_by(name=username).first()
 
-    if row:
-        try:
-            existing_data = json.loads(row[0]) if row[0] else {}
-        except json.JSONDecodeError:
-            existing_data = {}
-    else:
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        existing_data = json.loads(user.data) if user.data else {}
+    except json.JSONDecodeError:
         existing_data = {}
 
     saved_days = existing_data.get("saved_days", {})
@@ -577,9 +489,9 @@ def delete_meal():
 
             existing_data["saved_days"] = saved_days
 
-            cursor.execute("UPDATE users SET data = ? WHERE name = ?", (json.dumps(existing_data), username))
-            conn.commit()
-            conn.close()
+            # Update user data in the database
+            user.data = json.dumps(existing_data)
+            db.session.commit()
 
             return '', 200
         else:
@@ -594,7 +506,10 @@ def delete_meal():
 
 
 
+with app.app_context():
+    db.create_all()
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+
