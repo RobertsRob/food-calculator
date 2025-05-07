@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import re
 from datetime import date
 from models import db, User, Key  # предполагаем, что User определён как модель
+from zoneinfo import ZoneInfo
 
 
 app = Flask(__name__)
@@ -37,7 +38,8 @@ def index():
         except json.JSONDecodeError:
             data = {}
 
-        today = date.today().isoformat()
+        # today = date.today().isoformat()
+        today = datetime.now(ZoneInfo("Europe/Riga")).date().isoformat()
         return render_template(
             "index.html",
             username=username,
