@@ -339,11 +339,11 @@ def home():
     print(image_base64)
 
     prompt_text = (
+    f"User true information about food: {coment}"
     "Analyze the food shown in the image and return a JSON with keys: "
     "name (short name of the meal like 'Chicken with rice'), "
     "calories, protein, carbs, fats."
     " Respond with JSON only."
-    f"True information about food from user that you can use to analyse it: {coment}"
     )
 
     response = client.chat.completions.create(
@@ -351,7 +351,7 @@ def home():
         messages=[
             {
                 "role": "system",
-                "content": "You're a food nutrition analyzer. Use object size like forks or hands for portion estimate. Also use user given information about food!"
+                "content": "You're a food nutrition analyzer. Use user given text information about food! Use in image object size like forks or hands for portion estimate. "
             },
             {
                 "role": "user",
