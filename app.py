@@ -343,7 +343,7 @@ def home():
     "name (short name of the meal like 'Chicken with rice'), "
     "calories, protein, carbs, fats."
     " Respond with JSON only."
-    f"Coment about food: {coment}"
+    f"True information about food from user that you can use to analyse it: {coment}"
     )
 
     response = client.chat.completions.create(
@@ -351,7 +351,7 @@ def home():
         messages=[
             {
                 "role": "system",
-                "content": "You're a food nutrition analyzer. Use object size like forks or hands for portion estimate."
+                "content": "You're a food nutrition analyzer. Use object size like forks or hands for portion estimate. Also use user given information about food!"
             },
             {
                 "role": "user",
