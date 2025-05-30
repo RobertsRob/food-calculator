@@ -336,14 +336,18 @@ def home():
         return jsonify({"error": "Missing height, weight, or image"}), 400
 
     image_base64 = image_resizor.resize_image(image, target_size_kb=250)
-    print(image_base64)
+    # print(image_base64)
+
+    # prompt_text = (
+    # f"User true information about food: {coment}"
+    # "Analyze the food shown in the image and return a JSON with keys: "
+    # "name (short name of the meal like 'Chicken with rice'), "
+    # "calories, protein, carbs, fats."
+    # " Respond with JSON only."
+    # )
 
     prompt_text = (
-    f"User true information about food: {coment}"
-    "Analyze the food shown in the image and return a JSON with keys: "
-    "name (short name of the meal like 'Chicken with rice'), "
-    "calories, protein, carbs, fats."
-    " Respond with JSON only."
+        "Analyze the food shown in the image and return a paragraph of text with amount of ingredients shown in the food in the image. For example: chicken breast 250g, rice 150g, broccoli 100g."
     )
 
     response = client.chat.completions.create(
@@ -351,7 +355,7 @@ def home():
         messages=[
             {
                 "role": "system",
-                "content": "You're a food nutrition analyzer. Use user given text information about food! Use in image object size like forks or hands for portion estimate. "
+                "content": "You're a food nutrition analyzer. Use in image object size like forks or hands for portion estimate. "
             },
             {
                 "role": "user",
@@ -373,7 +377,61 @@ def home():
         temperature=0.5
     )
 
+    result_chat_text = response.choices[0].message.content.strip()
+    print(result_chat_text)
+
+    promt = f"""
+You will receive food data from two sources:
+
+1. **USER input** – provides info about food WHICH is THE MOST PRECISE INFO IN THE WORLD.
+2. **AI analysis** – identifies food items from an image.
+
+
+### Analyse the food data and return a JSON with amount of elements in the food. Prioriteze USER input over AI analysis.
+
+### Output format:
+Respond strictly in JSON format. There must be exactly these format and keys:
+
+json 
+"name": "string",
+"calories": float,
+"protein": float,
+"carbs": float,
+"fats": float
+
+### Data received:
+- User data (THE CORECT ONE): ({coment})
+- AI analysis (can contain amounth mistakes): ({result_chat_text})
+
+"""
+
+
+
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": "You're a food nutrition analyzer. Use in image object size like forks or hands for portion estimate. "
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": promt
+                    }
+                ]
+            }
+        ],
+        max_tokens=1000,
+        temperature=0.5
+    )
+
+
     result = response.choices[0].message.content.strip()
+    print(result)
     json_match = re.search(r"\{[\s\S]*?\}", result)
 
     if json_match:
